@@ -652,16 +652,23 @@ def train_model():
 
     df['current_score'] = df.groupby('match_id')['total_runs'].cumsum()
     df['runs_left'] = df['target'] - df['current_score']
-    df['balls_left'] = 120 - (df['over'] * 6 + df['ball'])
+    # Correct balls_left calculation using legal deliveries bowled:
+    # balls_bowled = ((over - 1) * 6) + ball
+    # and ensuring it is never negative.
+    balls_bowled = ((df['over'] - 1) * 6) + df['ball']
+    df['balls_left'] = (120 - balls_bowled).clip(lower=0)
 
     df['player_dismissed'] = df['player_dismissed'].notna().astype(int)
     df['wickets'] = df.groupby('match_id')['player_dismissed'].cumsum()
     df['wickets'] = 10 - df['wickets']
 
-    df['over'] = df['over'].replace(0, 0.1)
+    # Correct current run rate (crr) using correct overs bowled denominator:
+    # (over - 1) + (ball / 6)
+    overs_bowled = (df['over'] - 1) + (df['ball'] / 6)
+    df['crr'] = np.where(overs_bowled > 0, df['current_score'] / overs_bowled, 0.0)
 
-    df['crr'] = df['current_score'] / (df['over'] + df['ball'] / 6)
-    df['rrr'] = (df['runs_left'] * 6) / df['balls_left']
+    # Correct required run rate (rrr) avoiding division by zero when balls_left is 0
+    df['rrr'] = np.where(df['balls_left'] > 0, (df['runs_left'] * 6) / df['balls_left'], 0.0)
 
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
 
@@ -908,7 +915,7 @@ if st.session_state.page == "Analysis":
         score = st.number_input("Current Score", min_value=0, max_value=target - 1, value=50, step=1)
         col_ov, col_wk = st.columns(2)
         with col_ov:
-            overs = st.slider("Overs Completed", min_value=1, max_value=19, value=10)
+            overs = st.slider("Overs Completed", min_value=0, max_value=20, value=10)
         with col_wk:
             wickets = st.number_input("Wickets Fallen", min_value=0, max_value=9, value=2)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -996,9 +1003,9 @@ if st.session_state.page == "Analysis":
     # ---- PREDICTION OUTPUT ----
     if analyze:
         runs_left = target - score
-        balls_left = 120 - (overs * 6)
-        crr = score / overs if overs > 0 else 0
-        rrr = (runs_left * 6) / balls_left if balls_left > 0 else 0
+        balls_left = max(120 - (overs * 6), 0)
+        crr = score / overs if overs > 0 else 0.0
+        rrr = (runs_left * 6) / balls_left if balls_left > 0 else 0.0
 
         input_df = pd.DataFrame({
             'batting_team': [batting_team],
@@ -1014,10 +1021,17 @@ if st.session_state.page == "Analysis":
 
         with st.spinner(""):
             time.sleep(0.4)
-            proba = pipe.predict_proba(input_df)[0]
-
-        win = proba[1]
-        lose = proba[0]
+            # Edge-case handling for final ball/completed innings boundaries
+            if runs_left <= 0:
+                win = 1.0
+                lose = 0.0
+            elif balls_left <= 0:
+                win = 0.0
+                lose = 1.0
+            else:
+                proba = pipe.predict_proba(input_df)[0]
+                win = proba[1]
+                lose = proba[0]
 
         st.markdown('<div style="height:28px;"></div>', unsafe_allow_html=True)
         st.markdown("""
