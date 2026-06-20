@@ -69,14 +69,9 @@ def get_chain():
         st.error("⚠️ Groq API key not found.")
 
         st.info(
-            "Create .streamlit/secrets.toml"
-        )
-
-        st.code(
-            """
-[groq]
-key = "YOUR_GROQ_API_KEY"
-"""
+            "To enable the chatbot, create a `.streamlit/secrets.toml` file in the project root with:\n\n"
+            "```toml\n[groq]\nkey = \"YOUR_GROQ_API_KEY\"\n```\n\n"
+            "Get your free API key at https://console.groq.com"
         )
 
         st.stop()
@@ -102,23 +97,6 @@ key = "YOUR_GROQ_API_KEY"
 
     return chain
     
-
-    llm = ChatGroq(
-        groq_api_key=api_key,
-        model_name="llama-3.1-8b-instant",
-        temperature=0.7,
-        max_tokens=1024,
-    )
-
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", SYSTEM_PROMPT),
-        MessagesPlaceholder(variable_name="history"),   # sliding window injected here
-        ("human", "{question}"),
-    ])
-
-    chain = prompt | llm | StrOutputParser()
-    return chain
-
 
 
 

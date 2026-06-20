@@ -1185,7 +1185,7 @@ with st.sidebar:
         st.session_state.page = "Performance"
 
     if st.button("✦  Chatbot", key="nav_chatbot"):
-        st.session_state.page = "chabot"
+        st.session_state.page = "chatbot"
         
     st.markdown('<div class="sidebar-divider"></div>', unsafe_allow_html=True)
     st.markdown('<div class="sidebar-section-label">Model Configuration</div>', unsafe_allow_html=True)
@@ -2044,7 +2044,7 @@ if st.session_state.page == "Team Analysis":
         if st.button("⬅ Back to Dashboard"):
             st.session_state.page = "Dashboard"
             st.rerun()
-if st.session_state.page == "chabot":
+if st.session_state.page == "chatbot":
  
     # ---- Init session state ----
     if "chat_messages" not in st.session_state:
